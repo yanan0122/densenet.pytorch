@@ -9,7 +9,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-import torchvision.datasets as dset
+# import torchvision.datasets as dset
+from dataloader import CIFAR10
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
 
@@ -66,12 +67,12 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
     trainLoader = DataLoader(
-        dset.CIFAR10(root='cifar', train=True, download=True,
-                     transform=trainTransform),
+        CIFAR10(dataset_path='cifar', train=True, download=True,
+                transform=trainTransform),
         batch_size=args.batchSz, shuffle=True, **kwargs)
     testLoader = DataLoader(
-        dset.CIFAR10(root='cifar', train=False, download=True,
-                     transform=testTransform),
+        CIFAR10(dataset_path='cifar', train=False, download=True,
+                transform=testTransform),
         batch_size=args.batchSz, shuffle=False, **kwargs)
 
     net = densenet.DenseNet(growthRate=12, depth=100, reduction=0.5,
@@ -122,11 +123,12 @@ def train(args, epoch, net, trainLoader, optimizer, trainF):
         incorrect = pred.ne(target.data).cpu().sum()
         err = 100.*incorrect/len(data)
         partialEpoch = epoch + batch_idx / len(trainLoader) - 1
+        # print(loss)
         print('Train Epoch: {:.2f} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tError: {:.6f}'.format(
             partialEpoch, nProcessed, nTrain, 100. * batch_idx / len(trainLoader),
-            loss.data[0], err))
+            loss.data.item(), err))
 
-        trainF.write('{},{},{}\n'.format(partialEpoch, loss.data[0], err))
+        trainF.write('{},{},{}\n'.format(partialEpoch, loss.data.item(), err))
         trainF.flush()
 
 def test(args, epoch, net, testLoader, optimizer, testF):
@@ -138,7 +140,7 @@ def test(args, epoch, net, testLoader, optimizer, testF):
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
         output = net(data)
-        test_loss += F.nll_loss(output, target).data[0]
+        test_loss += F.nll_loss(output, target).data.item()
         pred = output.data.max(1)[1] # get the index of the max log-probability
         incorrect += pred.ne(target.data).cpu().sum()
 
