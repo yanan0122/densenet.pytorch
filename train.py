@@ -22,7 +22,7 @@ import math
 
 import shutil
 
-import setproctitle
+# import setproctitle
 
 import densenet
 import make_graph
@@ -45,7 +45,7 @@ def main():
     assert len(rate) == 10, "Rate length must be 10!"
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     args.save = args.save or 'work/densenet.base'
-    setproctitle.setproctitle(args.save)
+    # setproctitle.setproctitle(args.save)
 
     torch.manual_seed(args.seed)
     if args.cuda:
@@ -99,15 +99,15 @@ def main():
 
     trainF = open(os.path.join(args.save, 'train.csv'), 'w')
     testF = open(os.path.join(args.save, 'test.csv'), 'w')
-    trainF.write('partialEpoch,loss,err\n')
-    testF.write('partialEpoch,loss,err\n')
+    trainF.write('partialEpoch,loss,accuracy\n')
+    testF.write('partialEpoch,loss,accuracy\n')
 
     for epoch in range(1, args.nEpochs + 1):
         adjust_opt(args.opt, optimizer, epoch)
         train(args, epoch, net, trainLoader, optimizer, trainF)
         test(args, epoch, net, testLoader, optimizer, testF)
         torch.save(net, os.path.join(args.save, 'latest.pth'))
-        os.system('./plot.py {} &'.format(args.save))
+        # os.system('./plot.py {} &'.format(args.save))
 
     trainF.close()
     testF.close()
@@ -133,11 +133,11 @@ def train(args, epoch, net, trainLoader, optimizer, trainF):
         err = 100. * incorrect / len(data)
         partialEpoch = epoch + batch_idx / len(trainLoader) - 1
         # print(loss)
-        print('Train Epoch: {:.2f} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tError: {:.6f}'.format(
+        print('Train Epoch: {:.2f} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAccuracy: {:.6f}'.format(
             partialEpoch, nProcessed, nTrain, 100. * batch_idx / len(trainLoader),
-            loss.data.item(), err))
+            loss.data.item(), 100-err))
 
-        trainF.write('{},{},{}\n'.format(partialEpoch, loss.data.item(), err))
+        trainF.write('{},{},{}\n'.format(partialEpoch, loss.data.item(), 100-err))
         trainF.flush()
 
 
@@ -158,10 +158,10 @@ def test(args, epoch, net, testLoader, optimizer, testF):
     test_loss /= len(testLoader)  # loss function already averages over batch size
     nTotal = len(testLoader.dataset)
     err = 100. * incorrect / nTotal
-    print('\nTest set: Average loss: {:.4f}, Error: {}/{} ({:.0f}%)\n'.format(
-        test_loss, incorrect, nTotal, err))
+    print('\nTest set: Average loss: {:.4f}, Correct: {}/{} , Accuracy:{}\n'.format(
+        test_loss, nTotal-incorrect, nTotal, err))
 
-    testF.write('{},{},{}\n'.format(epoch, test_loss, err))
+    testF.write('{},{},{}\n'.format(epoch, test_loss, 100-err))
     testF.flush()
 
 
