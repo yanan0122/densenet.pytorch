@@ -27,6 +27,7 @@ import setproctitle
 import densenet
 import make_graph
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batchSz', type=int, default=64)
@@ -36,8 +37,12 @@ def main():
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--opt', type=str, default='sgd',
                         choices=('sgd', 'adam', 'rmsprop'))
+    parser.add_argument('--dataset_path', type=str)
+    parser.add_argument('--rate', type=str, default="[1,1,1,1,1,1,1,1,1,1]")
     args = parser.parse_args()
 
+    rate = eval(args.rate)
+    assert len(rate) == 10, "Rate length must be 10!"
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     args.save = args.save or 'work/densenet.base'
     setproctitle.setproctitle(args.save)
@@ -64,14 +69,15 @@ def main():
         transforms.ToTensor(),
         normTransform
     ])
+    print(args)
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
     trainLoader = DataLoader(
-        CIFAR10(dataset_path='cifar', train=True, download=True,
+        CIFAR10(rate=rate, dataset_path=args.dataset_path, train=True,
                 transform=trainTransform),
         batch_size=args.batchSz, shuffle=True, **kwargs)
     testLoader = DataLoader(
-        CIFAR10(dataset_path='cifar', train=False, download=True,
+        CIFAR10(rate=rate, dataset_path=args.dataset_path, train=False,
                 transform=testTransform),
         batch_size=args.batchSz, shuffle=False, **kwargs)
 
@@ -85,7 +91,7 @@ def main():
 
     if args.opt == 'sgd':
         optimizer = optim.SGD(net.parameters(), lr=1e-1,
-                            momentum=0.9, weight_decay=1e-4)
+                              momentum=0.9, weight_decay=1e-4)
     elif args.opt == 'adam':
         optimizer = optim.Adam(net.parameters(), weight_decay=1e-4)
     elif args.opt == 'rmsprop':
@@ -93,6 +99,8 @@ def main():
 
     trainF = open(os.path.join(args.save, 'train.csv'), 'w')
     testF = open(os.path.join(args.save, 'test.csv'), 'w')
+    trainF.write('partialEpoch,loss,err\n')
+    testF.write('partialEpoch,loss,err\n')
 
     for epoch in range(1, args.nEpochs + 1):
         adjust_opt(args.opt, optimizer, epoch)
@@ -103,6 +111,7 @@ def main():
 
     trainF.close()
     testF.close()
+
 
 def train(args, epoch, net, trainLoader, optimizer, trainF):
     net.train()
@@ -119,9 +128,9 @@ def train(args, epoch, net, trainLoader, optimizer, trainF):
         loss.backward()
         optimizer.step()
         nProcessed += len(data)
-        pred = output.data.max(1)[1] # get the index of the max log-probability
+        pred = output.data.max(1)[1]  # get the index of the max log-probability
         incorrect = pred.ne(target.data).cpu().sum()
-        err = 100.*incorrect/len(data)
+        err = 100. * incorrect / len(data)
         partialEpoch = epoch + batch_idx / len(trainLoader) - 1
         # print(loss)
         print('Train Epoch: {:.2f} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tError: {:.6f}'.format(
@@ -130,6 +139,7 @@ def train(args, epoch, net, trainLoader, optimizer, trainF):
 
         trainF.write('{},{},{}\n'.format(partialEpoch, loss.data.item(), err))
         trainF.flush()
+
 
 def test(args, epoch, net, testLoader, optimizer, testF):
     net.eval()
@@ -141,28 +151,34 @@ def test(args, epoch, net, testLoader, optimizer, testF):
         data, target = Variable(data, volatile=True), Variable(target)
         output = net(data)
         test_loss += F.nll_loss(output, target).data.item()
-        pred = output.data.max(1)[1] # get the index of the max log-probability
+        pred = output.data.max(1)[1]  # get the index of the max log-probability
         incorrect += pred.ne(target.data).cpu().sum()
 
     test_loss = test_loss
-    test_loss /= len(testLoader) # loss function already averages over batch size
+    test_loss /= len(testLoader)  # loss function already averages over batch size
     nTotal = len(testLoader.dataset)
-    err = 100.*incorrect/nTotal
+    err = 100. * incorrect / nTotal
     print('\nTest set: Average loss: {:.4f}, Error: {}/{} ({:.0f}%)\n'.format(
         test_loss, incorrect, nTotal, err))
 
     testF.write('{},{},{}\n'.format(epoch, test_loss, err))
     testF.flush()
 
+
 def adjust_opt(optAlg, optimizer, epoch):
     if optAlg == 'sgd':
-        if epoch < 150: lr = 1e-1
-        elif epoch == 150: lr = 1e-2
-        elif epoch == 225: lr = 1e-3
-        else: return
+        if epoch < 150:
+            lr = 1e-1
+        elif epoch == 150:
+            lr = 1e-2
+        elif epoch == 225:
+            lr = 1e-3
+        else:
+            return
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     main()

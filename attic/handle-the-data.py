@@ -8,7 +8,7 @@ class Data_handler:
     """
 
     def __init__(self, data_dir):
-        # assert os.path.exists(data_dir), "Data_dir is wrong!"
+        assert os.path.exists(data_dir), "Data_dir is wrong!"
         self.data_dir_path = data_dir
         train_list = os.listdir(self.data_dir_path)
         self.train_list = []
@@ -42,15 +42,16 @@ class Data_handler:
             entry = pickle.load(f, encoding="latin1")
             for i in range(len(entry['labels'])):
                 label = entry['labels'][i]
-                self.data[label]["data"].append(entry["data"][label])
+                self.data[label]["data"].append(entry["data"][i])
                 self.data[label]["labels"].append(label)
-                self.data[label]["filenames"].append(entry['filenames'][label])
+                self.data[label]["filenames"].append(entry['filenames'][i])
+
 
 
 
 
 if __name__ == '__main__':
-    data_hander = Data_handler("../cifar/cifar-10-batches-py")
+    data_hander = Data_handler("../../cifar/cifar-10-batches-py")
     # data_hander.handle_one_batch("../cifar/cifar-10-batches-py/data_batch_1")
     data_hander.divide_by_class("../cifar_after_divide")
     print("finish")

@@ -46,15 +46,17 @@ class CIFAR10(VisionDataset):
     }
 
     def __init__(
-        self,
-        dataset_path: str,
-        train: bool = True,
-        transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None,
-        download: bool = False,
+            self,
+            rate: list,
+            dataset_path: str,
+            train: bool = True,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
     ) -> None:
 
         super().__init__(dataset_path, transform=transform, target_transform=target_transform)
+
+        self.rate = rate
 
         self.train = train  # training set or test set
 
@@ -81,10 +83,20 @@ class CIFAR10(VisionDataset):
         self.targets = []
 
         # now load the picked numpy arrays
-        for file_name in files_list:
+        for i, file_name in enumerate(files_list):
             file_path = os.path.join(self.root, file_name)
             with open(file_path, "rb") as f:
                 entry = pickle.load(f, encoding="latin1")
+
+                # # check the dataset
+                # entry0 = entry['data'][0]
+                # for k in range(1, 5000):
+                #     if (entry0 == entry['data'][k]).all():
+                #         print("same")
+                #     else:
+                #         print("diff")
+
+                entry = self.reduce_data(entry, i)
                 self.data.append(entry["data"])
                 if "labels" in entry:
                     self.targets.extend(entry["labels"])
@@ -95,6 +107,18 @@ class CIFAR10(VisionDataset):
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
 
         self._load_meta()
+
+    def reduce_data(self, entry, class_num) -> dict:
+        new_entry = {"data": [],
+                     "labels": [],
+                     "filenames": []}
+        rand_number = np.random.randint(low=0, high=500, size=int(5000 * self.rate[class_num]))
+        rand_number.tolist()
+        for i in rand_number:
+            new_entry['data'].append(entry['data'][i])
+            new_entry['labels'].append(entry['labels'][i])
+            new_entry['filenames'].append(entry['filenames'][i])
+        return new_entry
 
     def _load_meta(self) -> None:
         path = os.path.join(self.root, self.meta["filename"])
@@ -176,6 +200,7 @@ class CIFAR100(CIFAR10):
 
 if __name__ == '__main__':
     import torchvision.transforms as transforms
+    from torch.utils.data import DataLoader
 
     normMean = [0.49139968, 0.48215827, 0.44653124]
     normStd = [0.24703233, 0.24348505, 0.26158768]
@@ -188,6 +213,11 @@ if __name__ == '__main__':
         normTransform
     ])
 
-    dataset = CIFAR10(dataset_path='cifar_after_divide', train=True, download=True,
+    rate = [0.5, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    dataset = CIFAR10(rate=rate, dataset_path='cifar_after_divide', train=True,
                       transform=trainTransform)
+    dataloader = DataLoader(dataset, shuffle=True, batch_size=16)
+    it = iter(dataloader)
+    data = next(it)
+
     print("")
